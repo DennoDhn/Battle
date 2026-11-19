@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./v2.css">
   <link rel="stylesheet" href="./v3.css">
-  <title>Battle Rush 3 — Crowd Battle</title>
+  <link rel="stylesheet" href="./v4.css">
+  <title>Battle Rush 4 — Crowd Battle</title>
 </head>
 <body>
   <main id="app" aria-label="Battle Rush Spiel">
@@ -31,8 +32,10 @@
         <div class="army-pill"><span class="army-dot"></span><span>DEINE ARMEE</span><strong id="hudArmy">10</strong></div>
         <div class="score-chip"><span class="coin-mark">●</span><strong id="hudCoins">0</strong></div><div class="life-pill" id="hudLives" aria-label="Fünf Leben">♥ ♥ ♥ ♥ ♥</div><div class="shield-pill" id="hudShield" aria-label="Schutzschild"></div>
       </div>
+      <div id="levelObjective" class="objective-tag">BONUSZIEL · 0/3 TORE</div>
       <div class="fever-track" aria-label="Feuermodus-Fortschritt"><span class="fever-flame">✦</span><div class="fever-meter"><div id="feverFill"></div></div></div>
     </header>
+    <button id="rallyBtn" class="rally-button" type="button" aria-label="Verstärkung rufen, sobald die Anzeige voll ist" disabled><span class="rally-glyph">⚔</span><strong id="rallyValue">0%</strong><small id="rallySub">VERSTÄRKUNG</small></button>
     <div class="world-note" id="worldNote" aria-live="polite"></div>
     <div class="combo" id="combo" aria-live="polite"></div><div class="battle-banner" id="battleBanner" aria-live="polite"></div>
     <div class="tip" id="tip"><span class="finger">↔</span> ZIEHEN, UM ZU LENKEN</div>
@@ -40,14 +43,16 @@
     <div class="screen visible" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
       <div class="menu-scene" aria-hidden="true"><span class="orb orb-blue"></span><span class="orb orb-red"></span><span class="slash"></span></div>
       <div class="menu-content">
-        <div class="eyebrow">CROWD BATTLE · ARCADE · VERSION 3.0</div>
+        <div class="eyebrow">CROWD BATTLE · ARCADE · VERSION 4.0</div>
         <h1 id="menuTitle">BATTLE<br><em>RUSH</em></h1>
         <p class="menu-lead">VERVIELFACHE DEINE ARMEE.<br>STÜRME FÜNF TORE. BESIEGE DEN BOSS.</p>
         <div class="wallet">MÜNZEN <span class="coin-mark">●</span> <strong id="menuCoins">0</strong></div>
-        <div class="how-to"><div><b>01</b><span>Finger ziehen: blaue Armee steuern</span></div><div><b>02</b><span>Grüne <i>×2</i>-Tore und Boni einsammeln</span></div><div><b>03</b><span>Schilde nutzen, rote Truppen besiegen</span></div></div>
+        <div class="campaign-line">KAMPAGNE · <strong id="menuMedals">0</strong> LEVEL-MEDAILLEN</div>
+        <div class="how-to"><div><b>01</b><span>Tippen oder ziehen: Armee steuern</span></div><div><b>02</b><span>Grüne <i>×2</i>-Tore, Banner und Kisten sammeln</span></div><div><b>03</b><span>Verstärkung aktivieren, Boss besiegen</span></div></div>
         <div class="upgrades" aria-label="Dauerhafte Verbesserungen">
           <button type="button" id="upgradeSoldiers" class="upgrade-card"><span class="upgrade-symbol">♟</span><span class="upgrade-copy"><b>STARTTRUPPEN</b><small>START +<span id="upgradeSoldiersLevel">0</span></small><strong id="upgradeSoldiersCost">60 MÜNZEN</strong></span></button>
           <button type="button" id="upgradeArmor" class="upgrade-card"><span class="upgrade-symbol">⬡</span><span class="upgrade-copy"><b>RÜSTUNG</b><small>STUFE <span id="upgradeArmorLevel">0/5</span></small><strong id="upgradeArmorCost">95 MÜNZEN</strong></span></button>
+          <button type="button" id="upgradeMagnet" class="upgrade-card"><span class="upgrade-symbol">◉</span><span class="upgrade-copy"><b>SAMMELMAGNET</b><small>REICHWEITE <span id="upgradeMagnetLevel">+0%</span></small><strong id="upgradeMagnetCost">125 MÜNZEN</strong></span></button>
           <button type="button" id="upgradeLuck" class="upgrade-card"><span class="upgrade-symbol">★</span><span class="upgrade-copy"><b>MÜNZENBONUS</b><small>EXTRA <span id="upgradeLuckLevel">+0%</span></small><strong id="upgradeLuckCost">110 MÜNZEN</strong></span></button>
         </div>
         <button class="action primary" id="startBtn" type="button">LEVEL <span id="menuStartLevel">01</span> SPIELEN <span>▶</span></button>
@@ -59,7 +64,7 @@
       <div class="modal-card"><div class="eyebrow">BATTLE RUSH</div><h2 id="pauseTitle">PAUSE</h2><p>Die Schlacht wartet auf dich.</p><button class="action primary" id="resumeBtn" type="button">WEITERSPIELEN <span>▶</span></button><button class="action secondary" id="restartBtn" type="button">NEU STARTEN</button></div>
     </div>
     <div class="screen" id="resultScreen" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
-      <div class="modal-card"><div class="result-icon" id="resultIcon">★</div><div class="eyebrow" id="resultEyebrow">LEVEL ABGESCHLOSSEN</div><h2 id="resultTitle">SIEG!</h2><p id="resultDescription">Deine Armee hat den Boss besiegt.</p><div id="resultMedal" class="result-medal">★ GOLD-MEDAILLE</div><div id="resultPerfect" class="result-perfect">5/5 TORE · 0 BONUSOBJEKTE</div><div class="result-stats"><div><span>LEVEL</span><strong id="resultLevel">01</strong></div><div><span>ARMEE</span><strong id="resultArmy">10</strong></div><div><span>MÜNZEN</span><strong id="resultCoins">+0</strong></div></div><button class="action primary" id="resultBtn" type="button">NÄCHSTER LEVEL <span>▶</span></button><button class="action secondary" id="resultMenuBtn" type="button">ZUM MENÜ</button></div>
+      <div class="modal-card"><div class="result-icon" id="resultIcon">★</div><div class="eyebrow" id="resultEyebrow">LEVEL ABGESCHLOSSEN</div><h2 id="resultTitle">SIEG!</h2><p id="resultDescription">Deine Armee hat den Boss besiegt.</p><div id="resultMedal" class="result-medal">★ GOLD-MEDAILLE</div><div id="resultPerfect" class="result-perfect">5/5 TORE · 0 BONUSOBJEKTE</div><div id="resultObjective" class="result-objective">BONUSZIEL</div><div class="result-stats"><div><span>LEVEL</span><strong id="resultLevel">01</strong></div><div><span>ARMEE</span><strong id="resultArmy">10</strong></div><div><span>MÜNZEN</span><strong id="resultCoins">+0</strong></div></div><button class="action primary" id="resultBtn" type="button">NÄCHSTER LEVEL <span>▶</span></button><button class="action secondary" id="resultMenuBtn" type="button">ZUM MENÜ</button></div>
     </div>
     <div class="rotate-hint" id="rotateHint">Im Hochformat spielt es sich am besten.</div>
   </main>
