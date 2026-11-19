@@ -7,6 +7,9 @@
     menu: $('menu'), pause: $('pauseScreen'), result: $('resultScreen'),
     hudLevel: $('hudLevel'), hudArmy: $('hudArmy'), hudLives: $('hudLives'),
     progress: $('progressFill'), note: $('worldNote'), tip: $('tip'), toast: $('toast'),
+    coins: $('hudCoins'), menuCoins: $('menuCoins'), upgradeSoldiers: $('upgradeSoldiers'), upgradeArmor: $('upgradeArmor'),
+    upgradeSoldiersCost: $('upgradeSoldiersCost'), upgradeArmorCost: $('upgradeArmorCost'), upgradeSoldiersLevel: $('upgradeSoldiersLevel'), upgradeArmorLevel: $('upgradeArmorLevel'),
+    resultCoins: $('resultCoins'), combo: $('combo'), battleBanner: $('battleBanner'),
     sound: $('soundBtn'), pauseBtn: $('pauseBtn'), menuBest: $('menuBest'),
     resultIcon: $('resultIcon'), resultEyebrow: $('resultEyebrow'),
     resultTitle: $('resultTitle'), resultDescription: $('resultDescription'),
@@ -15,6 +18,14 @@
   const TAU = Math.PI * 2;
   const MAX_ARMY = 999;
   const LENGTH = 765;
+  const SAVE_KEY = 'battle-rush-save-v2';
+  function readSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch { return {}; } }
+  const saved = readSave();
+  function upgradeCost(type) { return type === 'soldiers' ? 60 + upgrades.soldiers * 65 : 95 + upgrades.armor * 110; }
+  const upgrades = { soldiers: clampInt(saved.soldiers, 0, 10), armor: clampInt(saved.armor, 0, 5) };
+  function clampInt(v, a, b) { return Math.max(a, Math.min(b, Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : a)); }
+  function saveProgress() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({coins:state.coins, soldiers:upgrades.soldiers, armor:upgrades.armor, best:state.best})); } catch {} }
+  const startArmy = () => 10 + upgrades.soldiers * 5;
   let width = 390, height = 844, dpr = 1, lastFrame = 0, noteUntil = 0, toastUntil = 0;
   let audio = null;
   const storage = {
@@ -22,7 +33,8 @@
     write(key, value) { try { localStorage.setItem(key, String(value)); } catch { /* private browsing */ } }
   };
   const state = {
-    mode: 'menu', level: 1, best: Math.max(1, Number(storage.read('battle-rush-best', '1')) || 1),
+    mode: 'menu', level: 1, best: Math.max(1, clampInt(saved.best ?? storage.read('battle-rush-best', '1'), 1, 99999)),
+    coins: clampInt(saved.coins, 0, 999999), earned: 0, combo: 0, encounter: null, flash: 0, pace: 1,
     soundOn: storage.read('battle-rush-sound', '1') !== '0',
     distance: 0, army: 10, lives: 5, score: 0, playerX: 0,
     targetX: 0, time: 0, shake: 0, objects: [], particles: [], floaters: [],
@@ -84,6 +96,71 @@
     el.sound.textContent = state.soundOn ? '♫' : '♪';
     el.sound.setAttribute('aria-pressed', String(state.soundOn));
     el.menuBest.textContent = String(state.best).padStart(2, '0');
+    el.coins.textContent = state.coins.toLocaleString('de-DE');
+    el.menuCoins.textContent = state.coins.toLocaleString('de-DE');
+    el.upgradeSoldiersCost.textContent = upgrades.soldiers >= 10 ? 'MAX' : upgradeCost('soldiers') + ' MÜNZEN';
+    el.upgradeArmorCost.textContent = upgrades.armor >= 5 ? 'MAX' : upgradeCost('armor') + ' MÜNZEN';
+    el.upgradeSoldiersLevel.textContent = '+' + upgrades.soldiers * 5;
+    el.upgradeArmorLevel.textContent = upgrades.armor + '/5';
+    el.upgradeSoldiers.disabled = upgrades.soldiers >= 10 || state.coins < upgradeCost('soldiers');
+    el.upgradeArmor.disabled = upgrades.armor >= 5 || state.coins < upgradeCost('armor');
+    el.combo.textContent = state.combo >= 2 ? '×' + state.combo + ' TORE IN FOLGE' : '';
+    el.combo.classList.toggle('visible', state.combo >= 2);
+  }
+  function purchase(type) {
+    if (state.mode !== 'menu') return;
+    if (upgrades[type] >= (type === 'soldiers' ? 10 : 5)) return;
+    const cost = upgradeCost(type);
+    if (state.coins < cost) return;
+    state.coins -= cost; upgrades[type]++; saveProgress();
+    sound(620, .10, 'sine', 900, .06); setTimeout(() => sound(950, .12, 'sine', 1200, .06), 85);
+    updateHud(); toast(type === 'soldiers' ? 'STARTTRUPPEN VERBESSERT' : 'RÜSTUNG VERBESSERT');
+  }
+  function addCoins(n) {
+    const amount = Math.max(0, Math.round(n));
+    if (!amount) return;
+    state.coins = Math.min(999999, state.coins + amount);
+    state.earned += amount;
+    saveProgress();
+  }
+  function beginEncounter(obj) {
+    obj.used = false;
+    const boss = obj.type === 'boss';
+    const casualties = Math.max(1, Math.ceil(obj.count * (1 - upgrades.armor * .075)));
+    const beats = boss ? 1.75 : .8 + Math.min(.5, obj.count / 140);
+    state.encounter = {obj, boss, elapsed: 0, duration: beats, startArmy: state.army, startEnemy: obj.count,
+      losses: Math.min(state.army, casualties), opponentLosses: Math.min(obj.count, Math.ceil(state.army / (casualties || 1) * obj.count))};
+    state.shake = boss ? 14 : 7;
+    el.battleBanner.classList.add('visible');
+    el.battleBanner.textContent = boss ? 'BOSS-SCHLACHT!' : 'SCHLACHT!';
+    sound(215, .22, 'sawtooth', 110, .047);
+    haptic(boss ? 45 : 20);
+  }
+  function updateEncounter(dt) {
+    const e = state.encounter;
+    if (!e) return;
+    e.elapsed += dt;
+    const progress = clamp(e.elapsed / e.duration, 0, 1);
+    const eased = 1 - Math.pow(1 - progress, 1.55);
+    const currentArmy = Math.max(0, Math.round(e.startArmy - e.losses * eased));
+    const currentEnemy = Math.max(0, Math.round(e.startEnemy - e.opponentLosses * eased));
+    state.army = currentArmy;
+    e.obj.count = currentEnemy;
+    if (Math.random() < dt * 22) {
+      particlesAt(e.obj.x + (Math.random() - .5) * .35, 3, Math.random() < .5 ? '#fc4b5d' : '#49b8ff', 5, .5);
+      state.shake = Math.max(state.shake, 2.5);
+    }
+    if (progress < 1) return;
+    const obj = e.obj, boss = e.boss;
+    state.encounter = null; obj.used = true;
+    el.battleBanner.classList.remove('visible');
+    particlesAt(obj.x, 2, '#ff5b71', boss ? 58 : 24, 1.15);
+    floatText('-' + e.losses, obj.x, 2, '#ffe8ad');
+    if (state.army <= 0) { takeLife(boss ? 'BOSS ZU STARK!' : 'ARMEE BESIEGT!'); return; }
+    addCoins(boss ? 50 + state.level * 18 : 7 + Math.floor(e.startEnemy / 8));
+    state.score += e.startEnemy * 10;
+    if (boss) { showResult(true); }
+    else { state.combo = 0; announce('GEGNER BESIEGT!', 'good', .95); sound(660, .15, 'triangle', 1040, .07); }
   }
   function buildLevel(level) {
     const rng = random(level * 19937 + 413);
@@ -107,19 +184,24 @@
     const enemyPlaces = [128, 255, 378, 500, 629];
     enemyPlaces.forEach((z, index) => items.push({
       type: 'enemy', z, x: [-.57, .56, -.54, .54, 0][index],
-      count: Math.round(([12, 20, 30, 38, 55][index] + (level - 1) * (6 + index * 3))),
+      count: Math.round(([12, 20, 30, 38, 55][index] + (level - 1) * (5 + index * 2)) * (.90 + rng() * .22)),
       used: false, seed: rng() * 300
     }));
     [154, 283, 410, 539].forEach((z, index) => items.push({
       type: 'barrel', z, x: [.58, -.54, .56, -.54][index],
       damage: Math.round([12, 17, 21, 28][index] * (1 + (level - 1) * .23)), used: false
     }));
-    items.push({type: 'boss', z: 736, x: 0, count: 90 + (level - 1) * 65, used: false, seed: 0});
+    if (level >= 2) {
+      items.push({type: 'spikes', z: 349, x: level % 2 ? -.53 : .51, damage: 14 + level * 4, used: false});
+      if (level >= 3) items.push({type: 'spikes', z: 605, x: level % 2 ? .55 : -.53, damage: 20 + level * 5, used: false});
+    }
+    items.push({type: 'boss', z: 736, x: 0, count: 72 + (level - 1) * 40, used: false, seed: 0});
     return items;
   }
-  function prepareLevel(level, army = 10) {
+  function prepareLevel(level, army = startArmy()) {
     state.level = level; state.distance = 0; state.army = clamp(army, 10, MAX_ARMY);
-    state.playerX = 0; state.targetX = 0; state.shake = 0;
+    state.playerX = 0; state.targetX = 0; state.shake = 0; state.encounter = null; state.combo = 0; state.earned = 0;
+    el.battleBanner.classList.remove('visible');
     state.objects = buildLevel(level); state.particles = []; state.floaters = [];
     state.invulnerable = 1.4; state.moved = false;
     el.tip.classList.remove('hide'); updateHud();
@@ -142,11 +224,13 @@
     el.resultIcon.className = 'result-icon' + (win ? '' : ' lose');
     el.resultEyebrow.textContent = win ? 'LEVEL ABGESCHLOSSEN' : 'KEINE LEBEN MEHR';
     el.resultTitle.textContent = win ? 'SIEG!' : 'VERLOREN';
-    el.resultDescription.textContent = win ? 'Die rote Horde ist besiegt. Bereit für die nächste Schlacht?' : 'Sammle mehr Tore und weiche starken Gegnern aus.';
+    el.resultDescription.textContent = win ? 'Starke Runde! Sammle mehr Soldaten und sichere dir den nächsten Sieg.' : 'Wähle stärkere Tore und halte deine Truppen zusammen.';
+    if (win) addCoins(55 + state.level * 20 + Math.min(60, Math.floor(state.army / 4)));
+    el.resultCoins.textContent = '+' + state.earned.toLocaleString('de-DE');
     el.resultLevel.textContent = String(state.level).padStart(2, '0');
     el.resultArmy.textContent = String(state.army);
     el.resultBtn.innerHTML = win ? 'NÄCHSTER LEVEL <span>▶</span>' : 'NOCH MAL SPIELEN <span>▶</span>';
-    if (win) { state.best = Math.max(state.best, state.level + 1); storage.write('battle-rush-best', state.best); confetti(); sound(700, .2, 'sine', 1100, .1); }
+    if (win) { state.best = Math.max(state.best, state.level + 1); storage.write('battle-rush-best', state.best); saveProgress(); confetti(); sound(700, .2, 'sine', 1100, .1); }
     else sound(190, .35, 'sawtooth', 60, .12);
     updateHud(); setScreen(el.result, true);
   }
@@ -154,7 +238,7 @@
     state.lives = Math.max(0, state.lives - 1); state.shake = 13; haptic(90);
     sound(145, .25, 'sawtooth', 50, .11);
     if (!state.lives) { state.army = 0; showResult(false); return; }
-    prepareLevel(state.level, 10); state.invulnerable = 2;
+    prepareLevel(state.level, startArmy()); state.invulnerable = 2;
     announce(message || 'ARMEE VERLOREN!', 'bad', 1.5);
     toast('Noch ' + state.lives + ' Leben – probiere andere Tore!');
   }
@@ -182,49 +266,38 @@
     const previous = state.army;
     state.army = clamp(obj.kind === 'mul' ? state.army * obj.value : state.army + obj.value, 1, MAX_ARMY);
     const gained = state.army - previous;
+    state.combo++; if (state.combo >= 2) addCoins(3 * state.combo);
     particlesAt(obj.x, 2, '#52e4ff', 29, 1.25);
     floatText('+' + gained, obj.x, 1, '#a9fbff'); announce(obj.label + '  ·  +' + gained + ' SOLDATEN', 'good');
     sound(650, .15, 'sine', 1080, .075); haptic(20); state.score += gained;
   }
-  function enemyFight(obj) {
-    const won = state.army > obj.count;
-    const damage = Math.min(state.army, obj.count);
-    state.army -= damage;
-    particlesAt(obj.x, 2, '#ff586d', 25, 1.1);
-    floatText('-' + damage, obj.x, 0, '#ffb9c2');
-    state.shake = 7; haptic(25); sound(185, .16, 'sawtooth', 95, .07);
-    if (won) { state.score += obj.count * 10; announce('GEGNER BESIEGT!', 'good', .95); }
-    if (state.army <= 0) takeLife('ZU WENIGE SOLDATEN!');
-  }
+  function enemyFight(obj) { beginEncounter(obj); }
   function hitBarrel(obj) {
-    state.army = Math.max(0, state.army - obj.damage);
+    state.combo = 0; state.army = Math.max(0, state.army - obj.damage);
     particlesAt(obj.x, 1, '#ffc15d', 32, 1.5);
     floatText('-' + obj.damage, obj.x, 0, '#ffd6a1');
     state.shake = 11; sound(105, .24, 'sawtooth', 50, .12); haptic(45);
     if (state.army <= 0) takeLife('FASS EXPLODIERT!');
     else announce('−' + obj.damage + ' SOLDATEN', 'bad');
   }
-  function bossFight(obj) {
-    const remaining = state.army - obj.count;
-    particlesAt(0, 2, '#ff5e77', 75, 2.3);
-    state.shake = 22; haptic(100);
-    if (remaining > 0) { state.army = remaining; showResult(true); }
-    else takeLife('BOSS ZU STARK!');
-  }
+  function bossFight(obj) { beginEncounter(obj); }
   function handleCollisions() {
+    if (state.encounter) return;
     for (const obj of state.objects) {
-      if (obj.used || obj.z - state.distance > 3.6) continue;
+      if (obj.used || obj.z - state.distance > 2.5 || obj.z - state.distance < -7) continue;
       obj.used = true;
       if (obj.type === 'gate') {
         const siblings = state.objects.filter(other => other.type === 'gate' && other.group === obj.group);
         for (const sibling of siblings) sibling.used = true;
-        const selected = siblings.find(gate => Math.abs(gate.x - state.playerX) < .46);
+        const selected = siblings.find(gate => Math.abs(gate.x - state.playerX) < .49);
         if (selected) applyGate(selected);
         else toast('Tor verpasst! Lenke in eine der beiden Spuren.');
       } else if (obj.type === 'enemy') {
-        if (Math.abs(state.playerX - obj.x) < .43) { enemyFight(obj); if (state.mode !== 'playing') break; }
+        if (Math.abs(state.playerX - obj.x) < .49) { enemyFight(obj); break; }
       } else if (obj.type === 'barrel') {
         if (Math.abs(state.playerX - obj.x) < .31) { hitBarrel(obj); if (state.mode !== 'playing') break; }
+      } else if (obj.type === 'spikes') {
+        if (Math.abs(state.playerX - obj.x) < .36) { hitBarrel(obj); if (state.mode !== 'playing') break; }
       } else if (obj.type === 'boss') { bossFight(obj); break; }
       if (state.distance < 1) break;
     }
@@ -235,10 +308,9 @@
     if (state.mode === 'playing') {
       if (state.keyboard) state.targetX = clamp(state.targetX + state.keyboard * dt * 1.85, -.88, .88);
       state.playerX = lerp(state.playerX, state.targetX, Math.min(1, dt * 12));
-      state.distance += (18.5 + Math.min(5, (state.level - 1) * .5)) * dt;
+      if (state.encounter) updateEncounter(dt);
+      else { state.distance += (21.7 + Math.min(3, (state.level - 1) * .35)) * dt; handleCollisions(); }
       state.invulnerable = Math.max(0, state.invulnerable - dt);
-      handleCollisions();
-      if (state.distance > 760 && state.mode === 'playing') showResult(true);
       if (state.distance > 16) el.tip.classList.add('hide');
       updateHud();
     }
@@ -277,10 +349,18 @@
     ctx.beginPath(); ctx.moveTo(leftFar.x, far.y); ctx.lineTo(rightFar.x, far.y);
     ctx.lineTo(rightNear.x, near.y + 150); ctx.lineTo(leftNear.x, near.y + 150); ctx.closePath();
     ctx.fillStyle = ground; ctx.fill();
+    // Light direction and edge glints add volume to the raised stone arena.
+    const roadLight = ctx.createLinearGradient(leftNear.x, 0, rightNear.x, 0);
+    roadLight.addColorStop(0, '#a88f7033'); roadLight.addColorStop(.22, '#fff7db55');
+    roadLight.addColorStop(.65, '#ffffff00'); roadLight.addColorStop(1, '#79644b44');
+    ctx.fillStyle = roadLight; ctx.fill();
+    ctx.strokeStyle = '#fff4d199'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(leftFar.x,far.y); ctx.lineTo(leftNear.x,near.y+145);
+    ctx.moveTo(rightFar.x,far.y); ctx.lineTo(rightNear.x,near.y+145); ctx.stroke();
     const linesOffset = state.distance % 10;
     for (let z = 250 - linesOffset; z >= -14; z -= 10) {
       const a = project(-1.08, z), b = project(1.08, z);
-      ctx.strokeStyle = 'rgba(104,87,66,.16)'; ctx.lineWidth = Math.max(.5, 1.2 * a.p);
+      ctx.strokeStyle = 'rgba(104,87,66,.115)'; ctx.lineWidth = Math.max(.5, 1.2 * a.p);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
     for (const lane of [-.71, -.36, 0, .36, .71]) {
@@ -325,30 +405,41 @@
     const s = scale;
     if (s < .15) return;
     const enemy = color === 'red';
-    const main = enemy ? '#eb4058' : '#098ef0';
-    const light = enemy ? '#ff8292' : '#65dfff';
-    const dark = enemy ? '#9b1f3b' : '#0d4f9c';
-    const bob = Math.sin(tick * 13 + row * 1.6 + x * .13) * 1.1 * s;
-    ctx.fillStyle = '#1d365341'; ctx.beginPath(); ctx.ellipse(x, y + 3 * s, 6.8 * s, 2.3 * s, 0, 0, TAU); ctx.fill();
-    ctx.strokeStyle = dark; ctx.lineWidth = 2.4 * s; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x - 2 * s, y - 7 * s + bob); ctx.lineTo(x - 3 * s, y + 1.5 * s);
-    ctx.moveTo(x + 2 * s, y - 7 * s + bob); ctx.lineTo(x + 3 * s, y + 1.5 * s); ctx.stroke();
-    ctx.fillStyle = dark; roundedRect(x - 5.1 * s, y - 17 * s + bob, 10.2 * s, 11 * s, 2.4 * s);
-    ctx.fillStyle = main; roundedRect(x - 4.2 * s, y - 17 * s + bob, 8.4 * s, 9.5 * s, 2 * s);
-    ctx.fillStyle = light; roundedRect(x - 3.4 * s, y - 16.8 * s + bob, 2.3 * s, 7.8 * s, 1 * s);
-    ctx.strokeStyle = dark; ctx.lineWidth = 2.2 * s;
-    ctx.beginPath(); ctx.moveTo(x - 4.1 * s, y - 15 * s + bob); ctx.lineTo(x - 6.6 * s, y - 10 * s + bob);
-    ctx.moveTo(x + 4.1 * s, y - 15 * s + bob); ctx.lineTo(x + 6.6 * s, y - 9 * s + bob); ctx.stroke();
-    ctx.fillStyle = '#ffc7a6'; ctx.beginPath(); ctx.ellipse(x, y - 19.4 * s + bob, 3.45 * s, 3.2 * s, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = main; ctx.beginPath(); ctx.ellipse(x, y - 21.1 * s + bob, 4.2 * s, 3.2 * s, 0, Math.PI, TAU); ctx.fill();
-    ctx.fillStyle = light; roundedRect(x - 3.6 * s, y - 22.6 * s + bob, 3.5 * s, 1.3 * s, .4 * s);
+    const main = enemy ? '#db354a' : '#148cf0';
+    const light = enemy ? '#ff8e8b' : '#76d8ff';
+    const dark = enemy ? '#7f2136' : '#07539c';
+    const bob = Math.sin(tick * 14 + row * 1.6 + x * .04) * 1.15 * s;
+    // Contact shadow, animated stride and layered armor for a miniature figurine look.
+    ctx.fillStyle = '#25374a40'; ctx.beginPath(); ctx.ellipse(x + 1 * s, y + 2 * s, 6.6 * s, 3.1 * s, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = dark; ctx.lineWidth = 2.35 * s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x-2.3*s,y-7*s+bob); ctx.lineTo(x-3.5*s,y+Math.sin(tick*14+row)*1.9*s);
+    ctx.moveTo(x+2.3*s,y-7*s+bob); ctx.lineTo(x+3.4*s,y-Math.sin(tick*14+row)*1.9*s); ctx.stroke();
+    ctx.fillStyle = dark; roundedRect(x-5.3*s,y-17.8*s+bob,10.6*s,12*s,2.3*s);
+    const vest = ctx.createLinearGradient(x-5*s,y,x+5*s,y);
+    vest.addColorStop(0,dark); vest.addColorStop(.35,light);vest.addColorStop(.55,main);vest.addColorStop(1,dark);
+    roundedRect(x-4.2*s,y-17*s+bob,8.4*s,10*s,2*s,vest);
+    ctx.fillStyle = '#ffffff45'; roundedRect(x-3.2*s,y-16.8*s+bob,1.4*s,7.3*s,.5*s);
+    ctx.strokeStyle = dark;ctx.lineWidth = 2.25*s;
+    ctx.beginPath(); ctx.moveTo(x-4.2*s,y-14.7*s+bob);ctx.lineTo(x-6.1*s,y-9.4*s+bob);
+    ctx.moveTo(x+4.1*s,y-14.7*s+bob);ctx.lineTo(x+6.4*s,y-9.3*s+bob);ctx.stroke();
+    // Spear silhouettes make armies readable at distance, matching the battle-runner language.
+    if (s > .25) {
+      ctx.strokeStyle = '#5b4f47';ctx.lineWidth = 1.2*s;
+      ctx.beginPath();ctx.moveTo(x+6.4*s,y-7*s+bob);ctx.lineTo(x+7.7*s,y-29*s+bob);ctx.stroke();
+      ctx.fillStyle = '#e5e9e8';ctx.beginPath();ctx.moveTo(x+7.7*s,y-33*s+bob);ctx.lineTo(x+5.5*s,y-27.5*s+bob);ctx.lineTo(x+9.3*s,y-28*s+bob);ctx.closePath();ctx.fill();
+    }
+    ctx.fillStyle='#e6a783';ctx.beginPath();ctx.ellipse(x,y-19.6*s+bob,3.4*s,3.2*s,0,0,TAU);ctx.fill();
+    const helm=ctx.createLinearGradient(x-4*s,y,x+4*s,y);
+    helm.addColorStop(0,dark);helm.addColorStop(.32,light);helm.addColorStop(.66,main);helm.addColorStop(1,dark);
+    ctx.fillStyle=helm;ctx.beginPath();ctx.ellipse(x,y-21.6*s+bob,4.4*s,3.15*s,0,Math.PI,TAU);ctx.fill();
+    roundedRect(x-4.1*s,y-21.8*s+bob,8.2*s,1.7*s,.4*s,dark);
   }
   function drawCrowd(x, z, count, color, boss = false) {
     if (count <= 0) return;
-    const n = Math.min(count, boss ? 56 : 64);
-    const cols = Math.ceil(Math.sqrt(n * 1.45));
+    const n = Math.min(count, boss ? 82 : 90);
+    const cols = Math.ceil(Math.sqrt(n * 1.65));
     const rows = Math.ceil(n / cols);
-    const size = Math.min(1.16, width / 390) * (boss ? 1.2 : 1);
+    const size = Math.min(1.20, width / 390) * (boss ? 1.10 : 1) * (n > 65 ? .86 : 1);
     for (let row = rows - 1; row >= 0; row--) {
       for (let col = 0; col < cols; col++) {
         const index = row * cols + col;
@@ -356,7 +447,7 @@
         const rowCount = Math.min(cols, n - row * cols);
         if (col >= rowCount) continue;
         const jitter = Math.sin(index * 12.73 + (boss ? 1 : 2)) * .018;
-        const xx = clamp(x + (col - (rowCount - 1) / 2) * .103 + jitter, -.94, .94);
+        const xx = clamp(x + (col - (rowCount - 1) / 2) * (n > 65 ? .095 : .110) + jitter, -.94, .94);
         const zz = z + (rows - row - 1) * 3.05 + Math.sin(index * 4.9) * .55;
         if (zz < -11 || zz > 230) continue;
         const p = project(xx, zz);
@@ -381,7 +472,9 @@
     const grad = ctx.createLinearGradient(0, y, 0, p.y);
     grad.addColorStop(0, obj.kind === 'mul' ? '#88f7bfee' : '#73e0ffed');
     grad.addColorStop(1, obj.kind === 'mul' ? '#119c7bbd' : '#097db5c9');
-    roundedRect(p.x - w / 2, y, w, h, 4 * p.p, grad);
+    ctx.shadowColor = obj.kind === 'mul' ? '#37f4ad' : '#21c9ff'; ctx.shadowBlur = 17 * p.p;
+    roundedRect(p.x - w / 2, y, w, h, 4 * p.p, grad); ctx.shadowBlur=0;
+    ctx.fillStyle='#ffffff2a'; roundedRect(p.x-w/2+5*p.p,y+4*p.p,w-10*p.p,5*p.p,1*p.p);
     ctx.lineWidth = Math.max(1.5, p.p * 4);
     ctx.strokeStyle = obj.kind === 'mul' ? '#bbffdd' : '#b2f6ff';
     ctx.strokeRect(p.x - w / 2 + 1, y + 1, w - 2, h - 1);
@@ -401,6 +494,7 @@
     const wood = ctx.createLinearGradient(p.x - bw / 2, 0, p.x + bw / 2, 0);
     wood.addColorStop(0, '#80501e'); wood.addColorStop(.17, '#eab464'); wood.addColorStop(.52, '#c88532'); wood.addColorStop(.83, '#f2c875'); wood.addColorStop(1, '#7d4b20');
     roundedRect(p.x - bw / 2, p.y - bh, bw, bh, 10 * s, wood);
+    ctx.fillStyle='#fff4ca55'; roundedRect(p.x-bw*.24,p.y-bh*.91,bw*.18,bh*.82,3*s);
     for (const yy of [p.y - bh * .78, p.y - bh * .17]) {
       ctx.fillStyle = '#596a73'; ctx.fillRect(p.x - bw / 2, yy, bw, 5 * s);
       ctx.fillStyle = '#c1cbd0'; ctx.fillRect(p.x - bw / 2, yy, bw, 1 * s);
@@ -411,9 +505,20 @@
     ctx.strokeText(String(obj.damage), p.x, p.y - bh * .48);
     ctx.fillStyle = '#ffeda0'; ctx.fillText(String(obj.damage), p.x, p.y - bh * .48);
   }
+  function drawSpikes(obj, z) {
+    const p = project(obj.x, z), s = Math.max(.2, p.p) * Math.min(1.3, width / 390);
+    const w = 65 * s;
+    ctx.fillStyle = '#28334460'; ctx.beginPath();ctx.ellipse(p.x,p.y+4*s,w*.61,12*s,0,0,TAU);ctx.fill();
+    roundedRect(p.x-w/2,p.y-8*s,w,9*s,2*s,'#515967');
+    for (let i=0; i<5;i++) {
+      const cx=p.x-w*.41+i*w*.205;
+      ctx.fillStyle='#c7d4d7';ctx.beginPath();ctx.moveTo(cx-5*s,p.y-7*s);ctx.lineTo(cx,p.y-29*s);ctx.lineTo(cx+5*s,p.y-7*s);ctx.fill();
+      ctx.fillStyle='#657582';ctx.beginPath();ctx.moveTo(cx,p.y-29*s);ctx.lineTo(cx+5*s,p.y-7*s);ctx.lineTo(cx,p.y-7*s);ctx.fill();
+    }
+  }
   function drawBoss(obj, z) {
     const p = project(0, z + 10);
-    if (z < 210) drawCrowd(0, z, obj.count, 'red', true);
+    if (z < 220) drawCrowd(0, z, obj.count, 'red', true);
     const s = p.p;
     if (s < .25) return;
     const y = p.y - 95 * s;
@@ -430,6 +535,7 @@
       if (obj.type === 'gate') drawGate(obj, z);
       else if (obj.type === 'enemy') drawCrowd(obj.x, z, obj.count, 'red');
       else if (obj.type === 'barrel') drawBarrel(obj, z);
+      else if (obj.type === 'spikes') drawSpikes(obj, z);
       else if (obj.type === 'boss') drawBoss(obj, z);
     }
   }
@@ -468,6 +574,10 @@
     if (state.mode !== 'menu') { drawEntities(); drawPlayer(); }
     else { const p = project(0, 22); drawCrowd(-.26, 26, 18, 'blue'); drawCrowd(.33, 52, 22, 'red'); }
     drawEffects();
+    if (state.encounter) {
+      const a = Math.max(.02,.07 * (1-Math.abs(Math.sin(state.time*17))));
+      ctx.fillStyle = 'rgba(255,128,124,'+a+')';ctx.fillRect(0,0,width,height);
+    }
   }
   function frame(now) {
     const dt = lastFrame ? clamp((now - lastFrame) / 1000, 0, .04) : 0;
@@ -481,6 +591,7 @@
   }
   canvas.addEventListener('pointerdown', (event) => {
     if (state.mode !== 'playing') return;
+    if (event.pointerType === 'touch' && !event.isPrimary) return;
     state.drag = true; state.targetX = pointerToX(event.clientX); state.moved = true;
     el.tip.classList.add('hide');
     try { canvas.setPointerCapture(event.pointerId); } catch { /* Safari */ }
@@ -503,12 +614,14 @@
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   $('startBtn').addEventListener('click', startGame);
+  el.upgradeSoldiers.addEventListener('click', () => purchase('soldiers'));
+  el.upgradeArmor.addEventListener('click', () => purchase('armor'));
   $('pauseBtn').addEventListener('click', pause);
   $('resumeBtn').addEventListener('click', resume);
   $('restartBtn').addEventListener('click', startGame);
   $('resultBtn').addEventListener('click', () => {
     if (!state.resultWin) { startGame(); return; }
-    const carry = Math.max(10, Math.min(90, Math.floor(state.army * .35)));
+    const carry = Math.max(startArmy(), Math.min(135, Math.floor(state.army * .45)));
     prepareLevel(state.level + 1, carry); state.mode = 'playing'; setScreen(el.result, false);
     announce('LEVEL ' + String(state.level).padStart(2, '0'), 'good', 1.4);
   });
@@ -523,5 +636,5 @@
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
   // Expose read-only state to browser smoke tests without altering the gameplay.
-  Object.defineProperty(window, '__battleDiagnostics', {get: () => ({mode: state.mode, level: state.level, army: state.army, lives: state.lives, distance: state.distance, playerX: state.playerX, objectCount: state.objects.length})});
+  Object.defineProperty(window, '__battleDiagnostics', {get: () => ({mode: state.mode, level: state.level, army: state.army, lives: state.lives, distance: state.distance, playerX: state.playerX, objectCount: state.objects.length, coins: state.coins, upgrades:{...upgrades}, encounter: !!state.encounter, fpsTarget: 60})});
 })();
