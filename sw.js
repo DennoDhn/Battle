@@ -1,5 +1,5 @@
-const CACHE = 'battle-rush-v1';
-const FILES = ['./', './index.html', './style.css', './game.js', './manifest.webmanifest', './icon.svg'];
+const CACHE = 'battle-rush-v2';
+const FILES = ['./', './index.html', './style.css', './v2.css', './game.js', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting()));
 });
