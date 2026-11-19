@@ -1,27 +1,21 @@
-# Battle Rush
+# Battle Rush 2.0
 
-Ein originales, kostenloses 2.5D-Crowd-Battle-Spiel für Smartphones, Tablets und Desktop. Keine Bibliotheken, kein Backend, keine Werbung und keine In-App-Käufe.
+Eigenständiges kostenloses 2.5D-Crowd-Battle-Spiel für Smartphone, Tablet und Desktop. Inspiriert vom Crowd-Runner-Spielprinzip, ohne Übernahme fremder Marken oder Grafiken.
 
-## Spielen
+## Gameplay
 
-- **Handy / Tablet:** Mit dem Finger nach links oder rechts ziehen.
-- **Desktop:** Maus ziehen oder `A` / `D` beziehungsweise Pfeiltasten benutzen.
-- **Ziel:** Blaue Soldaten mit `+`- und `×`-Toren vermehren, roten Gegnern und nummerierten Fässern ausweichen oder sie besiegen, am Ende den Boss schlagen.
-- **Fünf Leben**, beliebig viele Level, steigende Schwierigkeit, Fortschritts- und Bestlevel-Anzeige, Pause sowie optionaler Sound.
+- Armee mit Touch/Wischen oder Maus/AD/Pfeiltasten steuern.
+- Zwischen Additions- und Multiplikations-Toren wählen.
+- Gegnergruppen in **animierten Schlachten** besiegen, nummerierten Fässern und Stachelfeldern ausweichen.
+- Bosskampf am Ende jeder Strecke; 5 Leben.
+- Münzen für Siege und Kämpfe; im Startmenü dauerhafte Upgrades für Starttruppen und Rüstung.
+- Zunehmende Gegnerstärke, neue Hindernisse ab Level 2 und Level-Fortschritt.
+- Optionaler synthetischer Ton, Haptik, automatisches Pausieren beim Appwechsel.
 
-## GitHub Pages
+## Hosting
 
-Repository **Settings → Pages → Build and deployment → Deploy from a branch → `main` / `/(root)` → Save**. Anschließend läuft das Spiel unter `https://dennodhn.github.io/Battle/`.
+GitHub → **Settings → Pages → Deploy from a branch → main → /(root)**. Spiel unter `https://dennodhn.github.io/Battle/`. Reines HTML/CSS/JS mit relativen Pfaden. Kein Backend, keine Drittanbieter-Cookies, kein Login und keine Kosten.
 
-## Technik
+## Technische Hinweise
 
-HTML5 Canvas mit perspektivischer 2.5D-Zeichnung, Pointer Events, responsives HUD, prozedural generierte Mini-Soldaten, ohne externe Abhängigkeiten. Relative Asset-Pfade für GitHub Pages. Installierbare PWA mit Service Worker und Offline-Cache, lokaler Speicherung des Bestlevels und der Toneinstellung.
-
-## Dateien
-
-- `index.html` – Oberfläche und Menüs
-- `style.css` – Responsive Design
-- `game.js` – Gameplay, Rendering, Steuerung, Sound
-- `manifest.webmanifest`, `sw.js`, `icon.svg` – Offline-PWA
-
-Das Spiel ist eine eigene Umsetzung des Crowd-Battle-Genres und nutzt keine Grafiken, Marken oder Programmteile aus dem App-Store-Spiel des Screenshots.
+Canvas 2D-Perspektive mit prozeduralen Miniatur-Soldaten, Schatten, Glanz und Animationen. Offline PWA mit versioniertem Cache, Nutzungsfortschritt über localStorage. Canvas passt sich an Displays an, Pointer Events unterstützen iOS Safari. Systemseitiges `prefers-reduced-motion` gilt für Oberflächenanimationen.
