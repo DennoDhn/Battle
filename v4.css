@@ -1,0 +1,22 @@
+/* Battle Rush v4 – touch-first and accessible arcade progression */
+:root{--cyan:#8deaff;--gold:#ffe6a0}
+.campaign-line{color:#d5e8fa;font-size:10px;letter-spacing:.13em;font-weight:900;margin:-2px 0 7px}
+.campaign-line strong{color:#ffe9a5;font-size:13px}
+.objective-tag{font-size:10px;font-weight:1000;color:#e1f8ff;letter-spacing:.07em;margin:5px 4px 2px;text-shadow:0 2px 4px #123b}
+.result-objective{font-size:12px;font-weight:900;color:#ffdfa1;margin:-5px 0 14px;letter-spacing:.05em}
+.rally-button{--charge:0%;position:absolute;z-index:3;bottom:calc(env(safe-area-inset-bottom) + 20px);right:calc(env(safe-area-inset-right) + 12px);width:91px;min-height:93px;border:2px solid #a7e8f5;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#d8edfa;background:linear-gradient(0deg,#185c8e var(--charge),#122c43 var(--charge));box-shadow:0 6px 18px #092c5277,inset 0 1px #fff5;transition:transform .14s,filter .18s;touch-action:manipulation;pointer-events:auto}
+.rally-button .rally-glyph{font-size:25px;line-height:1.05}.rally-button strong{font-size:16px;line-height:1.15}.rally-button small{font-size:8px;font-weight:900;letter-spacing:.025em;line-height:1.15;max-width:85px}
+.rally-button:disabled{opacity:.72;cursor:default}.rally-button.ready{color:#062947;border-color:#fff9ca;background:linear-gradient(160deg,#fff7bf,#ffd364 60%,#f8a437);box-shadow:0 0 27px #ffd766b5,0 9px 20px #52341555;animation:rallyGlow .9s ease-in-out infinite alternate}
+.rally-button.ready:active{transform:scale(.95)}
+@keyframes rallyGlow{to{box-shadow:0 0 44px #ffe9a1,0 10px 24px #52341555;filter:brightness(1.05)}}
+.upgrades{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.upgrade-card{min-height:96px;padding:7px 2px}.upgrade-symbol{font-size:21px}.upgrade-copy b{font-size:8px}.upgrade-copy small{font-size:8px}.upgrade-copy strong{font-size:8px;line-height:1.1}
+.tip{bottom:calc(env(safe-area-inset-bottom) + 45px);left:46%;font-size:11px;max-width:calc(100vw - 120px);white-space:normal;text-align:center}
+#menu.screen{overflow:auto;overscroll-behavior:contain;align-items:flex-start}
+.menu-content{margin:auto}
+@media(max-width:370px){.upgrades{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.upgrade-card{min-height:62px;display:flex;flex-direction:row;text-align:left;padding:6px 8px}.upgrade-symbol{font-size:22px}.upgrade-copy b{font-size:9px}.upgrade-copy strong{font-size:9px}.menu-content{padding:2px 0 5px}}
+@media(max-height:700px){.campaign-line{margin:0 0 4px}.objective-tag{font-size:9px}.rally-button{bottom:calc(env(safe-area-inset-bottom) + 9px);width:78px;min-height:81px}.rally-button .rally-glyph{font-size:21px}.menu-content h1{margin-top:5px;margin-bottom:6px}}
+@media(prefers-reduced-motion:reduce){.rally-button.ready{animation:none}}
+
+.menu-content h1{line-height:.93;letter-spacing:-.065em;text-shadow:0 5px 0 #061a37,0 18px 30px #0009}
+.menu-content h1 em{background:linear-gradient(#d2fbff 7%,#6fe8ff 44%,#23aaf0 86%,#1e8cd8);background-clip:text;-webkit-background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 #064d78)}
