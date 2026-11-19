@@ -1,6 +1,6 @@
 /* Versioned offline shell. Pages navigation stays network-first to avoid stale deploys. */
-const CACHE='battle-rush-v3.0';
-const SHELL=['./','./index.html','./style.css','./v2.css','./v3.css','./game.js','./manifest.webmanifest','./icon.svg'];
+const CACHE='battle-rush-v4.0';
+const SHELL=['./','./index.html','./style.css','./v2.css','./v3.css','./v4.css','./game.js','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('battle-rush-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',event=>{
