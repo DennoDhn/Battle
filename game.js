@@ -17,21 +17,27 @@
     upgradeLuck: $('upgradeLuck'), upgradeLuckCost: $('upgradeLuckCost'), upgradeLuckLevel: $('upgradeLuckLevel'),
     bonus: $('bonusBadge'), levelTheme: $('levelTheme'), menuStartLevel: $('menuStartLevel'),
     menuReplay: $('menuReplay'), resultMedal: $('resultMedal'), resultPerfect: $('resultPerfect'),
-    fever: $('feverFill'), shield: $('hudShield')
+    fever: $('feverFill'), shield: $('hudShield'),
+    rally: $('rallyBtn'), rallyValue: $('rallyValue'), rallySub: $('rallySub'),
+    objective: $('levelObjective'), medalCount: $('menuMedals'), upgradeMagnet: $('upgradeMagnet'),
+    upgradeMagnetCost: $('upgradeMagnetCost'), upgradeMagnetLevel: $('upgradeMagnetLevel'),
+    resultObjective: $('resultObjective')
   };
   const TAU = Math.PI * 2;
   const MAX_ARMY = 999;
   const LENGTH = 765;
-  const SAVE_KEY = 'battle-rush-save-v2'; // Reads v2 saves and stores backward-compatible v3 fields.
-  const BATTLE_VERSION = '3.0';
+  const SAVE_KEY = 'battle-rush-save-v2'; // Migrates existing v2/v3 browser saves without resetting progress.
+  const BATTLE_VERSION = '4.0';
   function readSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch { return {}; } }
   const saved = readSave();
-  function upgradeCost(type) { return type === 'soldiers' ? 60 + upgrades.soldiers * 65 : type === 'armor' ? 95 + upgrades.armor * 110 : 110 + upgrades.luck * 120; }
-  const upgrades = { soldiers: clampInt(saved.soldiers, 0, 10), armor: clampInt(saved.armor, 0, 5), luck: clampInt(saved.luck, 0, 5) };
+  function upgradeCost(type) { return type === 'soldiers' ? 60 + upgrades.soldiers * 65 : type === 'armor' ? 95 + upgrades.armor * 110 : type === 'luck' ? 110 + upgrades.luck * 120 : 125 + upgrades.magnet * 130; }
+  const upgrades = { soldiers: clampInt(saved.soldiers, 0, 10), armor: clampInt(saved.armor, 0, 5), luck: clampInt(saved.luck, 0, 5), magnet: clampInt(saved.magnet, 0, 5) };
+  const medals = saved.medals && typeof saved.medals === 'object' && !Array.isArray(saved.medals) ? {...saved.medals} : {};
+  const totalMedals = () => Object.values(medals).filter(value=>['GOLD','SILBER','BRONZE'].includes(value)).length;
   function clampInt(v, a, b) { return Math.max(a, Math.min(b, Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : a)); }
-  function saveProgress() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({coins:state.coins, soldiers:upgrades.soldiers, armor:upgrades.armor, luck:upgrades.luck, best:state.best, victories:state.victories, version:BATTLE_VERSION})); } catch {} }
+  function saveProgress() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({coins:state.coins, soldiers:upgrades.soldiers, armor:upgrades.armor, luck:upgrades.luck, magnet:upgrades.magnet, medals, best:state.best, victories:state.victories, version:BATTLE_VERSION})); } catch {} }
   const startArmy = () => 10 + upgrades.soldiers * 5;
-  let width = 390, height = 844, dpr = 1, lastFrame = 0, noteUntil = 0, toastUntil = 0;
+  let width = 390, height = 844, dpr = 1, lastFrame = 0, noteUntil = 0, toastUntil = 0, hudTick = 0, controlPointer = null, touchStartX = 0, targetStartX = 0;
   let audio = null;
   const storage = {
     read(key, fallback) { try { const value = localStorage.getItem(key); return value === null ? fallback : value; } catch { return fallback; } },
@@ -40,7 +46,8 @@
   const state = {
     mode: 'menu', level: 1, best: Math.max(1, clampInt(saved.best ?? storage.read('battle-rush-best', '1'), 1, 99999)),
     coins: clampInt(saved.coins, 0, 999999), victories: clampInt(saved.victories, 0, 99999), earned: 0, combo: 0, encounter: null, flash: 0, pace: 1,
-    theme: 'castle', shield: 0, fever: 0, feverActive: 0, hurt: false, collected: 0, gatesHit: 0,
+    theme: 'castle', shield: 0, fever: 0, feverActive: 0, rally: 0, rallyPulse: 0,
+    objectiveTarget: 3, objectiveDone: false, enemiesDefeated: 0, hurt: false, collected: 0, gatesHit: 0,
     elapsed: 0, lastReward: 0, medal: '', slowFrame: 0, fps: 60, fpsAvg: 60,
     soundOn: storage.read('battle-rush-sound', '1') !== '0',
     distance: 0, army: 10, lives: 5, score: 0, playerX: 0,
@@ -54,9 +61,11 @@
     castle: {name:'KÖNIGSBRÜCKE',sky:['#73a7c5','#d1eee2','#c2d5a9'],hill:'#81a29d',hill2:'#b2b9a0',road:['#d4bb94','#f2dfb3'],rail:['#bbb49d','#f3ead0','#898777'],tree:['#46745a','#83a86c']},
     coast:  {name:'KÜSTENFESTUNG',sky:['#548bbb','#e8dcb5','#e4c39e'],hill:'#6b97a0',hill2:'#a0bbad',road:['#c6ae93','#e6d3b7'],rail:['#c5bbb0','#eee6d9','#91877f'],tree:['#286d6e','#69b4a0']},
     valley: {name:'GRÜNES TAL',sky:['#6ea8d3','#d6eccc','#b8daa5'],hill:'#65948c',hill2:'#85ad86',road:['#bdb18c','#ded5ac'],rail:['#abb09f','#e8eace','#818777'],tree:['#327e50','#81bd60']},
-    dusk:   {name:'SONNENFESTUNG',sky:['#b37c98','#f5cba2','#e6bc9a'],hill:'#a07888',hill2:'#b69d96',road:['#c8ae9a','#edd4b5'],rail:['#bda4a0','#f5d9d1','#907b80'],tree:['#63765b','#c3a06a']}
+    dusk:   {name:'SONNENFESTUNG',sky:['#b37c98','#f5cba2','#e6bc9a'],hill:'#a07888',hill2:'#b69d96',road:['#c8ae9a','#edd4b5'],rail:['#bda4a0','#f5d9d1','#907b80'],tree:['#63765b','#c3a06a']},
+    snow:   {name:'FROSTPASS',sky:['#57799d','#d0e5f6','#e3f3f8'],hill:'#8daabd',hill2:'#c2d7df',road:['#c4cfd2','#e8e8e2'],rail:['#9aaeb8','#f3f9f8','#7f979c'],tree:['#3f6976','#7eaab5']},
+    desert: {name:'WÜSTENZITADELLE',sky:['#80aec3','#fde0a5','#f1c78a'],hill:'#c5a581',hill2:'#dfbd85',road:['#dec08b','#f7e2a8'],rail:['#caa36c','#fff0c8','#ad824f'],tree:['#7c9062','#adb875']}
   };
-  function themeFor(level) { return ['castle','coast','valley','dusk'][Math.floor((level - 1) / 2) % 4]; }
+  function themeFor(level) { return ['castle','coast','valley','dusk','snow','desert'][Math.floor((level - 1) / 2) % 6]; }
   const palette = () => THEMES[state.theme] || THEMES.castle;
   function resize() {
     width = Math.max(280, window.innerWidth);
@@ -129,6 +138,31 @@
     el.upgradeLuckCost.textContent = upgrades.luck >= 5 ? 'MAX' : upgradeCost('luck') + ' MÜNZEN';
     el.upgradeLuckLevel.textContent = '+' + upgrades.luck * 10 + '%';
     el.upgradeLuck.disabled = upgrades.luck >= 5 || state.coins < upgradeCost('luck');
+    el.upgradeMagnetCost.textContent = upgrades.magnet >= 5 ? 'MAX' : upgradeCost('magnet') + ' MÜNZEN';
+    el.upgradeMagnetLevel.textContent = '+' + upgrades.magnet * 8 + '%';
+    el.upgradeMagnet.disabled = upgrades.magnet >= 5 || state.coins < upgradeCost('magnet');
+    el.medalCount.textContent = String(totalMedals());
+    el.objective.textContent = `BONUSZIEL · ${Math.min(state.gatesHit,state.objectiveTarget)}/${state.objectiveTarget} TORE`;
+    const canRally=state.mode==='playing' && state.rally>=100 && !state.encounter;
+    el.rally.disabled=!canRally;
+    el.rally.classList.toggle('ready',canRally);
+    el.rally.style.setProperty('--charge',Math.round(state.rally)+'%');
+    el.rallyValue.textContent=state.rally>=100?'BEREIT':Math.floor(state.rally)+'%';
+    el.rallySub.textContent=state.rally>=100?'JETZT AKTIVIEREN':'VERSTÄRKUNG';
+  }
+  function chargeRally(value){
+    if(state.rally>=100)return;
+    const before=state.rally;
+    state.rally=clamp(state.rally+value,0,100);
+    if(before<100 && state.rally>=100){announce('VERSTÄRKUNG BEREIT!','good',1.5);sound(650,.22,'sine',1030,.07);}
+  }
+  function activateRally(){
+    if(state.mode!=='playing'||state.encounter||state.rally<100)return;
+    const amount=Math.max(12,Math.ceil(state.army*.24));
+    state.army=Math.min(MAX_ARMY,state.army+amount);state.rally=0;state.rallyPulse=1.15;
+    particlesAt(state.playerX,-2,'#8cf7ff',55,1.4);
+    floatText('+'+amount+' VERSTÄRKUNG',state.playerX,-1,'#b7fffb');
+    announce('VERSTÄRKUNG GERUFEN!','good',1.3);sound(430,.23,'triangle',920,.09);haptic(45);updateHud();
   }
   function purchase(type) {
     if (state.mode !== 'menu') return;
@@ -137,7 +171,7 @@
     if (state.coins < cost) return;
     state.coins -= cost; upgrades[type]++; saveProgress();
     sound(620, .10, 'sine', 900, .06); setTimeout(() => sound(950, .12, 'sine', 1200, .06), 85);
-    updateHud(); toast(type === 'soldiers' ? 'STARTTRUPPEN VERBESSERT' : type === 'armor' ? 'RÜSTUNG VERBESSERT' : 'MÜNZENBONUS VERBESSERT');
+    updateHud(); toast(type === 'soldiers' ? 'STARTTRUPPEN VERBESSERT' : type === 'armor' ? 'RÜSTUNG VERBESSERT' : type === 'luck' ? 'MÜNZENBONUS VERBESSERT' : 'MAGNET VERBESSERT');
   }
   function addCoins(n) {
     const amount = Math.max(0, Math.round(n * (1 + upgrades.luck * .10)));
@@ -148,9 +182,9 @@
   }
   function beginEncounter(obj) {
     const boss = obj.type === 'boss';
-    const elite = obj.type === 'elite';
+    const elite = obj.type === 'elite' || obj.type === 'siege';
     const advantage = state.army / Math.max(1, obj.count);
-    const weight = boss ? 1.2 : elite ? 1.12 : 1;
+    const weight = boss ? 1.18 : elite ? 1.12 : obj.type==='siege'?1.35:1;
     const armor = 1 - upgrades.armor * .075;
     const fury = state.feverActive > 0 ? .58 : 1;
     const outnumber = advantage > 2.6 ? .76 : advantage > 1.7 ? .88 : 1;
@@ -160,7 +194,7 @@
       startArmy:state.army,startEnemy:obj.count,losses, wins, opponentLosses:wins ? obj.count : Math.max(1,Math.round(obj.count * state.army / Math.max(losses,1) * .85))};
     state.shake = boss ? 11 : 5;
     el.battleBanner.classList.add('visible');
-    el.battleBanner.textContent = boss ? 'BOSS-SCHLACHT!' : elite ? 'ELITE-ANGRIFF!' : 'SCHLACHT!';
+    el.battleBanner.textContent = boss ? 'BOSS-SCHLACHT!' : obj.type==='siege' ? 'BELAGERUNGSTRUPPEN!' : elite ? 'ELITE-ANGRIFF!' : 'SCHLACHT!';
     sound(boss?170:235,.22,'sawtooth',95,.047); haptic(boss?40:15);
   }
   function updateEncounter(dt) {
@@ -184,7 +218,7 @@
     floatText('-'+e.losses,obj.x,2,'#ffe8ad');
     if (state.army <= 0) { takeLife(boss?'BOSS ZU STARK!':'ARMEE BESIEGT!'); return; }
     addCoins(boss ? 48 + state.level*16 : e.elite ? 20+state.level*4 : 7+Math.floor(e.startEnemy/8));
-    state.score += e.startEnemy*10;
+    state.score += e.startEnemy*10; state.enemiesDefeated++;chargeRally(boss?30:e.elite?22:12);
     if (boss) showResult(true);
     else { state.combo=0; announce(e.elite?'ELITE BESIEGT!':'GEGNER BESIEGT!','good',.95); sound(660,.15,'triangle',1040,.07); }
   }
@@ -214,6 +248,7 @@
       const count=Math.round((([12,19,27,38,49][index]) + (level-1)*(4+index*2))*(.90+rng()*.18));
       items.push({type:elite?'elite':'enemy',z,x:[-.57,.56,-.54,.54,0][index],count,used:false,seed:rng()*300});
     });
+    if(level>=4){items.push({type:'siege',z:688,x:level%2?-.55:.55,count:Math.round(30+level*6),used:false,seed:rng()*300});}
     [154,283,410,539].forEach((z,index)=>items.push({
       type:'barrel',z,x:[.58,-.54,.56,-.54][index],
       damage:Math.round([12,17,21,28][index]*(1+(level-1)*.18)),used:false
@@ -222,6 +257,12 @@
       items.push({type:'spikes',z:349,x:level%2?-.53:.51,damage:12+level*4,used:false});
       if(level>=4) items.push({type:'spikes',z:605,x:level%2?.55:-.53,damage:18+level*5,used:false});
     }
+    // Telegraph the danger: mines occupy one lane and can be avoided by steering.
+    if(level>=3)items.push({type:'mine',z:level%2?592:578,x:level%2?-.51:.51,damage:Math.round(11+level*3.2),used:false});
+    if(level>=7)items.push({type:'mine',z:level%2?294:295,x:level%2?.54:-.54,damage:Math.round(13+level*3.5),used:false});
+    // Consistent rewards: banners grow your crowd, chests add coins; the player chooses a lane.
+    items.push({type:'banner',z:level%2?172:178,x:level%2?-.54:.54,value:12+Math.min(55,level*3),used:false});
+    if(level>=2)items.push({type:'chest',z:level%2?456:463,x:level%2?.54:-.54,value:24+Math.min(110,level*7),used:false});
     // Additional collection decisions between hazards and gates; no external service needed.
     [99,225,350,477,603].forEach((z,index)=> {
       const pos=(index+level)%3===0?0:((index+level)%2?-.56:.56);
@@ -234,11 +275,13 @@
   }
   function prepareLevel(level, army = startArmy()) {
     state.level = level; state.distance = 0; state.army = clamp(army, 10, MAX_ARMY); state.theme=themeFor(level);
-    state.shield=0; state.fever=0; state.feverActive=0; state.hurt=false; state.collected=0; state.gatesHit=0; state.elapsed=0;
+    state.shield=0; state.fever=0; state.feverActive=0; state.rally=0; state.rallyPulse=0;
+    state.objectiveTarget=level>=6?5:level>=3?4:3; state.objectiveDone=false; state.enemiesDefeated=0;
+    state.hurt=false; state.collected=0; state.gatesHit=0; state.elapsed=0;
     state.playerX = 0; state.targetX = 0; state.shake = 0; state.encounter = null; state.combo = 0; state.earned = 0;
     el.battleBanner.classList.remove('visible');
     state.objects = buildLevel(level); state.particles = []; state.floaters = [];
-    state.invulnerable = 1.4; state.moved = false;
+    state.invulnerable = 1.4; state.moved = false;state.drag=false;controlPointer=null;
     el.tip.classList.remove('hide'); updateHud();
   }
   function startGame(level = state.best) {
@@ -247,7 +290,7 @@
     announce('BAUE DEINE ARMEE!', 'good', 1.8);
     sound(510, .13, 'sine', 780, .07);
   }
-  function pause() { if (state.mode !== 'playing') return; state.mode = 'paused'; setScreen(el.pause, true); }
+  function pause() { if (state.mode !== 'playing') return; state.drag=false;controlPointer=null;state.mode = 'paused'; setScreen(el.pause, true); }
   function resume() { if (state.mode !== 'paused') return; state.mode = 'playing'; setScreen(el.pause, false); lastFrame = performance.now(); }
   function backToMenu() {
     state.mode = 'menu'; setScreen(el.pause, false); setScreen(el.result, false);
@@ -259,8 +302,8 @@
     el.resultIcon.className = 'result-icon' + (win ? '' : ' lose');
     el.resultEyebrow.textContent = win ? 'LEVEL ABGESCHLOSSEN' : 'KEINE LEBEN MEHR';
     el.resultTitle.textContent = win ? 'SIEG!' : 'VERLOREN';
-    el.resultDescription.textContent = win ? 'Starke Runde! Sammle mehr Soldaten und sichere dir den nächsten Sieg.' : 'Wähle stärkere Tore und halte deine Truppen zusammen.';
-    if (win) { addCoins(55 + state.level * 20 + Math.min(60, Math.floor(state.army / 4))); if(!state.hurt && state.gatesHit>=4) addCoins(35+state.level*5); state.victories++; }
+    el.resultDescription.textContent = win ? 'Boss besiegt! Deine Armee ist bereit für die nächste Schlacht.' : 'Sammle vor dem Boss stärkere Tore und zusätzliche Truppen.';
+    if (win) { addCoins(55 + state.level * 20 + Math.min(60, Math.floor(state.army / 4))); if(!state.hurt && state.gatesHit>=4) addCoins(35+state.level*5); state.objectiveDone=state.gatesHit>=state.objectiveTarget; if(state.objectiveDone)addCoins(25+state.level*5);state.victories++; }
     el.resultCoins.textContent = '+' + state.earned.toLocaleString('de-DE');
     el.resultLevel.textContent = String(state.level).padStart(2, '0');
     el.resultArmy.textContent = String(state.army);
@@ -268,7 +311,11 @@
     state.medal = win ? (!state.hurt && state.gatesHit >= 4 ? 'GOLD' : state.gatesHit >= 3 ? 'SILBER' : 'BRONZE') : '';
     if (el.resultMedal) el.resultMedal.textContent = win ? (state.medal==='GOLD'?'★ GOLD-MEDAILLE':state.medal==='SILBER'?'◆ SILBER-MEDAILLE':'● BRONZE-MEDAILLE') : 'VERSUCH ES ERNEUT';
     if (el.resultPerfect) el.resultPerfect.textContent = win ? `${state.gatesHit}/5 TORE · ${state.collected} BONUSOBJEKTE` : 'VERBESSERE DEINE STRATEGIE';
-    if (win) { state.best = Math.max(state.best, state.level + 1); storage.write('battle-rush-best', state.best); saveProgress(); confetti(); sound(700, .2, 'sine', 1100, .1); }
+    el.resultObjective.textContent=win?(state.objectiveDone?'BONUSZIEL ERREICHT · EXTRA MÜNZEN':'BONUSZIEL NICHT ERREICHT'):'NÄCHSTE RUNDE: STÄRKERE TORE WÄHLEN';
+    if (win) { state.best = Math.max(state.best, state.level + 1);
+      const rank={BRONZE:1,SILBER:2,GOLD:3};const old=medals[state.level];
+      if(!old||(rank[state.medal]||0)>(rank[old]||0))medals[state.level]=state.medal;
+      storage.write('battle-rush-best', state.best); saveProgress(); confetti(); sound(700, .2, 'sine', 1100, .1); }
     else sound(190, .35, 'sawtooth', 60, .12);
     updateHud(); setScreen(el.result, true);
   }
@@ -306,6 +353,7 @@
     const gained = state.army - previous;
     state.gatesHit++; state.combo++; if (state.combo >= 2) addCoins(3 * state.combo);
     state.fever=clamp(state.fever+24,0,100);
+    if(gained>0)chargeRally(21);
     if(state.fever>=100){state.feverActive=10;state.fever=0;announce('FEUER-MODUS! STARKE TRUPPEN','good',1.5);particlesAt(obj.x,2,'#ffda59',48,1.4);}
     particlesAt(obj.x, 2, '#52e4ff', 29, 1.25);
     floatText((gained>=0?'+':'') + gained, obj.x, 1, gained>=0?'#a9fbff':'#ffc0be'); announce(obj.label + '  ·  ' + (gained>=0?'+':'') + gained + ' SOLDATEN', gained>=0?'good':'bad');
@@ -324,37 +372,39 @@
   }
   function bossFight(obj) { beginEncounter(obj); }
   function pickUp(obj){
-    const values={coin:'#ffdc6c',shield:'#74eaff',heart:'#ff789e'};
+    const values={coin:'#ffdc6c',shield:'#74eaff',heart:'#ff789e',banner:'#77ffd5',chest:'#ffe69b'};
     particlesAt(obj.x,0,values[obj.type],24,.8);
     state.collected++;
     if(obj.type==='coin') {addCoins(obj.value);floatText('+'+obj.value+' MÜNZEN',obj.x,1,'#fff1a1');sound(820,.12,'sine',1260,.065);}
     else if(obj.type==='shield'){state.shield=Math.min(2,state.shield+1);announce('SCHUTZSCHILD GESAMMELT','good');sound(480,.23,'triangle',940,.072);}
+    else if(obj.type==='banner'){state.army=Math.min(MAX_ARMY,state.army+obj.value);chargeRally(25);announce('+'+obj.value+' REKRUTEN!','good');floatText('+'+obj.value+' SOLDATEN',obj.x,1,'#9affdf');sound(640,.20,'sine',1150,.073);}
+    else if(obj.type==='chest'){addCoins(obj.value);chargeRally(14);announce('SCHATZ +'+obj.value+' MÜNZEN!','good');floatText('+'+obj.value+' MÜNZEN',obj.x,1,'#ffed99');sound(710,.22,'triangle',1110,.075);}
     else {if(state.lives<5){state.lives++;announce('+1 LEBEN','good');}else{addCoins(18+state.level*3);announce('BONUS-MÜNZEN!','good');}sound(700,.23,'sine',1050,.072);}
   }
   function handleCollisions(){
     if(state.encounter) return;
     for(const obj of state.objects){
       if(obj.used || obj.z-state.distance>2.5 || obj.z-state.distance < -7) continue;
-      if(!(['enemy','elite','boss'].includes(obj.type) && (obj.type==='boss'||Math.abs(state.playerX-obj.x)<.49))) obj.used=true;
+      if(!(['enemy','elite','siege','boss'].includes(obj.type) && (obj.type==='boss'||Math.abs(state.playerX-obj.x)<.49))) obj.used=true;
       if(obj.type==='gate'){
         const siblings=state.objects.filter(other=>other.type==='gate'&&other.group===obj.group);
         for(const sibling of siblings) sibling.used=true;
         const selected=siblings.find(gate=>Math.abs(gate.x-state.playerX)<.49);
         if(selected)applyGate(selected);
         else {state.combo=0;toast('Tor verpasst! In die linke oder rechte Spur lenken.');}
-      }else if(obj.type==='enemy'||obj.type==='elite'){
+      }else if(obj.type==='enemy'||obj.type==='elite'||obj.type==='siege'){
         if(Math.abs(state.playerX-obj.x)<.49){beginEncounter(obj);break;}
-      }else if(obj.type==='barrel'||obj.type==='spikes'){
+      }else if(obj.type==='barrel'||obj.type==='spikes'||obj.type==='mine'){
         if(Math.abs(state.playerX-obj.x)<.31){hitBarrel(obj);if(state.mode!=='playing')break;}
-      }else if(obj.type==='coin'||obj.type==='shield'||obj.type==='heart'){
-        if(Math.abs(state.playerX-obj.x)<.37)pickUp(obj);
+      }else if(['coin','shield','heart','banner','chest'].includes(obj.type)){
+        if(Math.abs(state.playerX-obj.x)<.37*(1+upgrades.magnet*.08))pickUp(obj);
       }else if(obj.type==='boss'){beginEncounter(obj);break;}
     }
   }
   function update(dt) {
     state.time += dt;
     if(state.mode==='playing'){state.elapsed+=dt;state.feverActive=Math.max(0,state.feverActive-dt);}
-    state.shake = Math.max(0, state.shake - 32 * dt);
+    state.shake = Math.max(0, state.shake - 32 * dt);state.rallyPulse=Math.max(0,state.rallyPulse-dt);
     if (state.mode === 'playing') {
       if (state.keyboard) state.targetX = clamp(state.targetX + state.keyboard * dt * 1.85, -.88, .88);
       state.playerX = lerp(state.playerX, state.targetX, Math.min(1, dt * 12));
@@ -362,7 +412,7 @@
       else { state.distance += (21.7 + Math.min(3, (state.level - 1) * .35)) * dt; handleCollisions(); }
       state.invulnerable = Math.max(0, state.invulnerable - dt);
       if (state.distance > 16) el.tip.classList.add('hide');
-      updateHud();
+      hudTick-=dt; if(hudTick<=0){updateHud();hudTick=.1;}
     }
     for (const particle of state.particles) { particle.x += particle.vx * dt; particle.y += particle.vy * dt; particle.vy += 380 * dt; particle.life -= dt; }
     state.particles = state.particles.filter(p => p.life > 0);
@@ -403,6 +453,18 @@
     for(let i=0;i<5;i++)ctx.fillRect(fx+i*fw*.23,fy-fw*.28,fw*.14,fw*.23);
     ctx.fillRect(fx+fw*.35,fy-fw*.48,fw*.3,fw*.58);
     ctx.fillStyle='#e9f8fa44';ctx.fillRect(fx+fw*.46,fy-fw*.41,fw*.035,fw*.18);
+    // Distant banners and weather keep levels visually distinct without costly assets.
+    for(const offset of [-.32,.32]){
+      ctx.strokeStyle='#536b78bb';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(width*.5+offset*width,fy-10);ctx.lineTo(width*.5+offset*width,fy-43);ctx.stroke();
+      ctx.fillStyle=state.theme==='dusk'?'#e69a7a':'#5faec9';ctx.beginPath();
+      const bx=width*.5+offset*width,by=fy-43;ctx.moveTo(bx,by);ctx.lineTo(bx+15,by+4);ctx.lineTo(bx+4,by+12);ctx.lineTo(bx,by+10);ctx.fill();
+    }
+    if(state.theme==='snow'){
+      ctx.fillStyle='#efffff85';for(let i=0;i<31;i++){const x=(i*47.1+state.time*12)%(width+24)-12;const y=(i*73.7+state.time*24)%(height*.78);ctx.beginPath();ctx.arc(x,y,1+(i%3)*.5,0,TAU);ctx.fill();}
+    }
+    if(state.theme==='desert'){
+      ctx.fillStyle='#ffe1ac52';for(let i=0;i<17;i++){const x=(i*59+state.time*25)%(width+28)-14;const y=height*(.32+(i%9)*.045);ctx.fillRect(x,y,8+(i%3)*4,1);}
+    }
   }
   function drawRoad() {
     const far = project(0, 270), near = project(0, -12);
@@ -513,7 +575,7 @@
   }
   function drawCrowd(x, z, count, color, boss = false) {
     if (count <= 0) return;
-    const n = Math.min(count, boss ? 92 : 98);
+    const n = Math.min(count, boss ? 106 : 112);
     const cols = Math.ceil(Math.sqrt(n * 1.65));
     const rows = Math.ceil(n / cols);
     const size = Math.min(1.20, width / 390) * (boss ? 1.10 : 1) * (n > 65 ? .86 : 1);
@@ -600,7 +662,7 @@
     const cy=p.y-30*s+float;
     ctx.fillStyle='#233a4244';ctx.beginPath();ctx.ellipse(p.x,p.y,22*s,5*s,0,0,TAU);ctx.fill();
     const aura=ctx.createRadialGradient(p.x,cy,2,p.x,cy,35*s);
-    const glow=obj.type==='coin'?'255,212,84':obj.type==='shield'?'66,222,252':'255,103,153';
+    const glow=obj.type==='coin'||obj.type==='chest'?'255,212,84':obj.type==='shield'?'66,222,252':obj.type==='banner'?'111,244,166':'255,103,153';
     aura.addColorStop(0,`rgba(${glow},.35)`);aura.addColorStop(1,`rgba(${glow},0)`);
     ctx.fillStyle=aura;ctx.beginPath();ctx.ellipse(p.x,cy,37*s,37*s,0,0,TAU);ctx.fill();
     if(obj.type==='coin'){
@@ -615,9 +677,27 @@
       ctx.fillStyle='#71edff';ctx.beginPath();ctx.moveTo(p.x,cy-25*s);ctx.lineTo(p.x+20*s,cy-13*s);ctx.lineTo(p.x+15*s,cy+13*s);ctx.lineTo(p.x,cy+24*s);ctx.lineTo(p.x-15*s,cy+13*s);ctx.lineTo(p.x-20*s,cy-13*s);ctx.closePath();ctx.fill();
       ctx.strokeStyle='#f0ffff';ctx.lineWidth=3*s;ctx.stroke();
       ctx.fillStyle='#0d7dbe';ctx.font=`1000 ${22*s}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('◆',p.x,cy);
+    }else if(obj.type==='banner'){
+      ctx.strokeStyle='#b6eff5';ctx.lineWidth=3*s;ctx.beginPath();ctx.moveTo(p.x-9*s,cy+25*s);ctx.lineTo(p.x-9*s,cy-24*s);ctx.stroke();
+      ctx.fillStyle='#1acb93';ctx.beginPath();ctx.moveTo(p.x-8*s,cy-25*s);ctx.lineTo(p.x+23*s,cy-17*s);ctx.lineTo(p.x+14*s,cy-3*s);ctx.lineTo(p.x-8*s,cy-8*s);ctx.fill();
+      ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`1000 ${17*s}px system-ui`;ctx.fillStyle='#fff';ctx.fillText('+'+obj.value,p.x+4*s,cy-12*s);
+    }else if(obj.type==='chest'){
+      roundedRect(p.x-23*s,cy-12*s,46*s,30*s,6*s,'#a45b28');
+      roundedRect(p.x-26*s,cy-18*s,52*s,12*s,5*s,'#ffd574');
+      roundedRect(p.x-6*s,cy-18*s,12*s,30*s,3*s,'#f4df9a');
+      ctx.fillStyle='#915623';ctx.fillRect(p.x-2*s,cy-4*s,4*s,9*s);
     }else{
       ctx.font=`1000 ${42*s}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=3*s;ctx.strokeStyle='#fff0f5';ctx.strokeText('♥',p.x,cy);ctx.fillStyle='#ff4973';ctx.fillText('♥',p.x,cy);
     }
+  }
+  function drawMine(obj,z){
+    const p=project(obj.x,z),s=Math.max(.22,p.p)*Math.min(1.3,width/390);
+    ctx.fillStyle='#111b2344';ctx.beginPath();ctx.ellipse(p.x,p.y,24*s,7*s,0,0,TAU);ctx.fill();
+    const metal=ctx.createRadialGradient(p.x-4*s,p.y-20*s,1,p.x,p.y-12*s,27*s);
+    metal.addColorStop(0,'#a4aab0');metal.addColorStop(.48,'#515c62');metal.addColorStop(1,'#222a34');
+    ctx.fillStyle=metal;ctx.beginPath();ctx.arc(p.x,p.y-16*s,20*s,0,TAU);ctx.fill();
+    for(let i=0;i<7;i++){const a=i*TAU/7;ctx.save();ctx.translate(p.x+Math.cos(a)*18*s,p.y-16*s+Math.sin(a)*18*s);ctx.rotate(a+Math.PI/2);ctx.fillStyle='#66747d';ctx.beginPath();ctx.moveTo(-5*s,0);ctx.lineTo(0,-12*s);ctx.lineTo(5*s,0);ctx.fill();ctx.restore();}
+    ctx.fillStyle='#ef6364';ctx.beginPath();ctx.arc(p.x,p.y-18*s,4*s,0,TAU);ctx.fill();
   }
   function drawBoss(obj, z) {
     const p = project(0, z + 10);
@@ -636,10 +716,11 @@
     for (const obj of visible) {
       const z = obj.z - state.distance;
       if (obj.type === 'gate') drawGate(obj, z);
-      else if (obj.type === 'enemy' || obj.type === 'elite') drawCrowd(obj.x, z, obj.count, obj.type==='elite'?'elite':'red');
+      else if (obj.type === 'enemy' || obj.type === 'elite' || obj.type === 'siege') drawCrowd(obj.x, z, obj.count, obj.type==='enemy'?'red':'elite');
       else if (obj.type === 'barrel') drawBarrel(obj, z);
       else if (obj.type === 'spikes') drawSpikes(obj, z);
-      else if (['coin','shield','heart'].includes(obj.type)) drawPickup(obj,z);
+      else if (obj.type === 'mine') drawMine(obj,z);
+      else if (['coin','shield','heart','banner','chest'].includes(obj.type)) drawPickup(obj,z);
       else if (obj.type === 'boss') drawBoss(obj, z);
     }
   }
@@ -655,6 +736,7 @@
     drawCrowd(state.playerX, state.encounter?-1.7:-1, state.army, 'blue');
     if(state.shield>0){ctx.strokeStyle='#a5f8ffb6';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(p.x,p.y-6,54,31,0,0,TAU);ctx.stroke();}
     if(state.feverActive>0){ctx.strokeStyle='#ffd76a99';ctx.lineWidth=2.8;ctx.beginPath();ctx.ellipse(p.x,p.y-7,62+Math.sin(state.time*9)*2,35,0,0,TAU);ctx.stroke();}
+    if(state.rallyPulse>0){const spread=1+(1-state.rallyPulse/1.15)*2.5;ctx.globalAlpha=Math.min(1,state.rallyPulse);ctx.strokeStyle='#a7f8ff';ctx.lineWidth=4/spread;ctx.beginPath();ctx.ellipse(p.x,p.y-5,42*spread,13*spread,0,0,TAU);ctx.stroke();ctx.globalAlpha=1;}
   }
   function drawEffects() {
     for (const particle of state.particles) {
@@ -697,23 +779,31 @@
     return clamp((clientX - center) / (rect.width * .43), -.88, .88);
   }
   canvas.addEventListener('pointerdown', (event) => {
-    if (state.mode !== 'playing') return;
+    if (state.mode !== 'playing' || controlPointer !== null) return;
     if (event.pointerType === 'touch' && !event.isPrimary) return;
-    state.drag = true; state.targetX = pointerToX(event.clientX); state.moved = true;
+    controlPointer=event.pointerId;touchStartX=event.clientX;targetStartX=state.targetX;
+    state.drag = true; state.moved = false;
     el.tip.classList.add('hide');
     try { canvas.setPointerCapture(event.pointerId); } catch { /* Safari */ }
   });
   canvas.addEventListener('pointermove', (event) => {
-    if (state.mode === 'playing' && state.drag) state.targetX = pointerToX(event.clientX);
+    if (state.mode !== 'playing' || !state.drag || event.pointerId !== controlPointer) return;
+    if (Math.abs(event.clientX-touchStartX)>7)state.moved=true;
+    state.targetX=clamp(targetStartX+(event.clientX-touchStartX)/(canvas.getBoundingClientRect().width*.39),-.88,.88);
   });
-  const release = () => { state.drag = false; };
-  canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('pointerup', event=>{
+    if(event.pointerId!==controlPointer)return;
+    if(!state.moved && state.mode==='playing')state.targetX=pointerToX(event.clientX);
+    controlPointer=null;state.drag=false;
+  });
+  canvas.addEventListener('pointercancel', event=>{if(event.pointerId===controlPointer){controlPointer=null;state.drag=false;}});
   window.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') { state.keyboard = -1; event.preventDefault(); }
     if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') { state.keyboard = 1; event.preventDefault(); }
     if (event.key === 'Escape' || event.key.toLowerCase() === 'p') {
       if (state.mode === 'playing') pause(); else if (state.mode === 'paused') resume();
     }
+    if (event.code==='Space' && state.mode==='playing'){event.preventDefault();activateRally();}
     if (event.key === 'Enter' && state.mode === 'menu') startGame();
   });
   window.addEventListener('keyup', (event) => {
@@ -725,6 +815,8 @@
   el.upgradeSoldiers.addEventListener('click', () => purchase('soldiers'));
   el.upgradeArmor.addEventListener('click', () => purchase('armor'));
   el.upgradeLuck.addEventListener('click', () => purchase('luck'));
+  el.upgradeMagnet.addEventListener('click', () => purchase('magnet'));
+  el.rally.addEventListener('click', activateRally);
   $('pauseBtn').addEventListener('click', pause);
   $('resumeBtn').addEventListener('click', resume);
   $('restartBtn').addEventListener('click', () => startGame(state.level));
@@ -746,5 +838,5 @@
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
   // Expose read-only state to browser smoke tests without altering the gameplay.
-  Object.defineProperty(window, '__battleDiagnostics', {get: () => ({mode: state.mode, level: state.level, army: state.army, lives: state.lives, distance: state.distance, playerX: state.playerX, objectCount: state.objects.length, coins: state.coins, upgrades:{...upgrades}, encounter: !!state.encounter, fpsTarget: 60, fps:Math.round(state.fpsAvg),shield:state.shield,fever:Math.round(state.fever),theme:state.theme,objects:state.objects.map(({type,z,x,used,count})=>({type,z,x,used,count}))})});
+  Object.defineProperty(window, '__battleDiagnostics', {get: () => ({mode: state.mode, level: state.level, army: state.army, lives: state.lives, distance: state.distance, playerX: state.playerX, objectCount: state.objects.length, coins: state.coins, upgrades:{...upgrades}, medalCount:totalMedals(), objectiveTarget:state.objectiveTarget, gatesHit:state.gatesHit, rally:Math.round(state.rally), encounter: !!state.encounter, fpsTarget: 60, fps:Math.round(state.fpsAvg),shield:state.shield,fever:Math.round(state.fever),theme:state.theme,objects:state.objects.map(({type,z,x,used,count})=>({type,z,x,used,count}))})});
 })();
