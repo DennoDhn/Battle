@@ -1,0 +1,35 @@
+/* Battle Rush v3 — bright toy soldier arcade polish */
+:root{--gold:#ffe3a0;--cyan:#87edff}
+#vignette{background:linear-gradient(180deg,rgba(16,27,43,.16),transparent 27%,transparent 76%,rgba(19,30,44,.19)),radial-gradient(ellipse at center,transparent 60%,rgba(10,30,51,.10))}
+.hud{padding-left:clamp(8px,2.5vw,14px);padding-right:clamp(8px,2.5vw,14px)}
+.hud-row:first-child{gap:5px}.logo-chip{font-weight:1000;letter-spacing:.01em}
+.progress-track{height:8px;margin:9px 4px 2px}
+.level-subhead{display:flex;justify-content:space-between;min-height:15px;align-items:center;padding:0 5px;gap:7px;line-height:1}
+#levelTheme{font-weight:1000;font-size:9px;color:#ebffff;letter-spacing:.20em;text-shadow:0 2px 4px #123}
+#bonusBadge{font-size:9px;color:#ffe8aa;font-weight:1000;text-shadow:0 1px 4px #654;letter-spacing:.09em}
+#bonusBadge.active{color:#fff3a0;animation:pulseBonus .75s ease-in-out infinite alternate}
+@keyframes pulseBonus{to{filter:brightness(1.5);transform:scale(1.03)}}
+.hud-bottom{gap:5px}.army-pill{padding:6px 8px;gap:6px}.army-pill strong{font-size:clamp(16px,4.8vw,23px)}
+.score-chip{min-width:51px}.life-pill{padding:8px 7px;letter-spacing:0;font-size:clamp(10px,3.2vw,16px)}
+.shield-pill{display:none;align-items:center;justify-content:center;min-width:38px;color:#b4f9ff;white-space:nowrap;font-size:13px;font-weight:1000;background:#0c5269d9;border:1px solid #a9f2ff80;box-shadow:0 0 12px #a8eeff55;border-radius:11px;padding:5px}
+.shield-pill.active{display:flex}
+.fever-track{margin:6px 0 0;display:flex;gap:5px;align-items:center;max-width:190px;opacity:.9}
+.fever-flame{color:#ffe580;text-shadow:0 0 12px #e99c27;font-size:12px}
+.fever-meter{flex:1;background:#193347a6;height:6px;border-radius:6px;border:1px solid #f9f0dc66;overflow:hidden}
+#feverFill{height:100%;width:0;background:linear-gradient(90deg,#f5ab2d,#fff0a5);transition:width .12s linear;box-shadow:0 0 9px #ffbd5e}
+.menu-content{max-width:435px;padding:10px 0 4px}
+#menu.screen{padding:calc(env(safe-area-inset-top) + 7px) 12px calc(env(safe-area-inset-bottom) + 7px)}
+.menu-content h1{font-size:clamp(53px,14vw,82px);margin:8px 0 9px}
+.menu-lead{font-size:11px;margin:0 0 7px}.wallet{margin:3px 0 8px;padding:4px 12px}
+.how-to{margin-bottom:9px;padding:5px 12px}.how-to>div{padding:4px 0;font-size:11px}.how-to b{font-size:14px}
+.upgrades{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+.upgrade-card{padding:7px 3px;min-height:93px;border-radius:13px;gap:4px}
+.upgrade-symbol{font-size:22px}.upgrade-copy b{font-size:9px;letter-spacing:0}.upgrade-copy small{font-size:9px}.upgrade-copy strong{font-size:9px;line-height:1.15}
+.replay-start{display:block;margin-top:8px;background:transparent;border:0;color:#bcdbed;text-decoration:underline;text-underline-offset:3px;font-size:10px;font-weight:900;letter-spacing:.08em;padding:4px 12px}
+.best-line{margin-top:8px}
+.result-medal{margin:-17px 0 7px;color:#ffe9ac;font-size:16px;font-weight:1000;letter-spacing:.06em;text-shadow:0 2px 4px #000}
+.result-perfect{font-size:11px;color:#addfff;letter-spacing:.10em;font-weight:800;margin-bottom:16px}.result-stats{margin-bottom:24px}
+@media(max-height:720px){.menu-content h1{font-size:clamp(45px,12vw,60px);margin:4px 0 7px}.menu-lead{font-size:10px}.wallet{margin-bottom:4px}.how-to{margin-bottom:6px;padding:3px 9px}.how-to>div{padding:3px 0}.upgrade-card{min-height:77px;padding:5px 2px;gap:2px}.upgrade-symbol{font-size:17px}.upgrades{margin-bottom:7px}.action{padding:12px}.best-line{margin-top:5px}}
+@media(max-height:590px){.how-to{display:none}.menu-content h1{font-size:48px}.upgrade-card{min-height:69px}.menu-lead{display:block;margin-bottom:3px}.replay-start{margin-top:5px}}
+@media(max-width:355px){.logo-chip{font-size:9px;padding:0 6px}.logo-symbol{font-size:15px}.hud-chip{padding:0 7px}.hud-button{min-width:32px}.army-pill span:not(.army-dot){display:none}.upgrade-copy strong{font-size:8px}}
+@media(prefers-reduced-motion:reduce){#bonusBadge.active{animation:none}}
