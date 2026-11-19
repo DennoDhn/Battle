@@ -1,0 +1,31 @@
+
+/* Battle Rush 2.0 — bright toy-soldier arcade presentation. */
+:root{color-scheme:dark;background:#a9c8bc}
+#vignette{background:linear-gradient(180deg,rgba(8,19,35,.22),transparent 28%,transparent 82%,rgba(23,30,39,.26)),radial-gradient(ellipse at center,transparent 54%,rgba(32,36,43,.12));}
+.hud{padding-top:calc(env(safe-area-inset-top) + 10px);}
+.hud-chip,.hud-button,.army-pill,.life-pill,.score-chip{background:rgba(18,40,58,.84);border:1px solid #edfaff59;box-shadow:0 4px 0 #09192d32,0 9px 19px #10233842,inset 0 1px #ffffff38;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.hud-chip{min-height:41px}.logo-chip{font-weight:1000;font-size:12px}.logo-chip b{color:#a3f8ff}
+.hud-bottom{align-items:stretch;gap:6px}.army-pill{flex:1;min-width:0}.life-pill{display:flex;align-items:center;letter-spacing:0;font-size:clamp(12px,3.7vw,17px);padding:8px 7px;border-radius:11px;white-space:nowrap}.score-chip{display:flex;align-items:center;gap:5px;border-radius:11px;padding:0 9px;font-size:13px;font-weight:1000}
+.coin-mark{display:inline-grid;place-items:center;width:18px;height:18px;background:linear-gradient(135deg,#fffca7,#ffb52b 66%,#d37e17);border-radius:50%;border:2px solid #fff6bc;box-shadow:0 1px 0 #965c12,0 0 7px #ffe27799;color:#a3651a;font-size:9px;vertical-align:middle;flex:none}
+.hud-row:first-child{gap:6px}.wave-chip{padding:0 8px}.hud-button{min-width:38px;min-height:41px}
+.combo{position:absolute;top:calc(env(safe-area-inset-top) + 151px);left:50%;transform:translate(-50%,-6px) scale(.94);opacity:0;pointer-events:none;transition:.2s;color:#fff9ca;font-size:13px;font-weight:1000;letter-spacing:.13em;text-shadow:0 2px 5px #9d6200,0 0 15px #ffc400}.combo.visible{opacity:1;transform:translate(-50%,0) scale(1)}
+.battle-banner{position:absolute;z-index:4;left:50%;top:40%;transform:translate(-50%,-40%) scale(.8);opacity:0;pointer-events:none;color:#fff4d8;font-size:clamp(21px,7vw,40px);font-weight:1000;letter-spacing:.08em;white-space:nowrap;text-shadow:0 3px 0 #ad253b,0 7px 12px #561c2d;transition:opacity .15s,transform .15s}.battle-banner.visible{opacity:1;transform:translate(-50%,-40%) scale(1)}
+.screen{background:linear-gradient(165deg,rgba(9,25,43,.87),rgba(7,30,49,.82) 57%,rgba(6,21,40,.94));}
+#menu.screen{align-items:center;overflow-y:auto;overscroll-behavior:contain}
+.menu-content{padding:10px 0;max-width:398px}
+.menu-content h1{margin:12px 0 11px;font-size:clamp(62px,17vw,89px);line-height:.85;text-shadow:0 5px 0 #003754,0 12px 25px #00112d}
+.menu-content h1 em{background-image:linear-gradient(#ecfeff,#65e8ff 52%,#008cdd)}
+.menu-lead{margin-bottom:8px;color:#e9f8ff;font-size:12px;line-height:1.45}
+.wallet{margin:3px 0 12px;border:1px solid #f8e6a266;border-radius:18px;padding:5px 14px;color:#ffe7a0;background:#0c2539cf;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:850;letter-spacing:.12em}.wallet strong{font-size:18px;color:#fff}
+.how-to{margin:0 0 12px;border-radius:15px;padding:7px 12px;background:#f2faff11}.how-to>div{padding:5px 0;font-size:12px}.how-to b{font-size:16px}
+.upgrades{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:100%;margin-bottom:14px}
+.upgrade-card{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;padding:11px 7px;min-height:99px;border:1px solid #a5e1ff70;border-radius:15px;background:linear-gradient(160deg,#184d6c,#08213e);box-shadow:inset 0 1px #ffffff33,0 5px 0 #03152d66;color:#fff}
+.upgrade-card:disabled{opacity:.49;filter:saturate(.65);box-shadow:none;cursor:default}
+.upgrade-symbol{font-size:23px;color:#a7edff;text-shadow:0 0 12px #73dbff}.upgrade-copy{display:flex;flex-direction:column;gap:3px;align-items:center;text-align:center}.upgrade-copy b{font-size:10px;letter-spacing:.04em}.upgrade-copy small{font-size:10px;color:#c8e0f2}.upgrade-copy strong{font-size:10px;color:#ffdf8e}
+.action.primary{background:linear-gradient(#d9ffff,#64eeff 30%,#0495ed 91%);box-shadow:0 5px 0 #00649a,0 14px 24px #0008,inset 0 1px #fff;border:1px solid #dbffffee}
+.best-line{margin-top:17px}
+.modal-card{background:linear-gradient(180deg,#1d4869fc,#071b30fc);border:1px solid #c8f3ff77}
+.result-stats{gap:7px}.result-stats>div{min-width:0}.result-stats strong{font-size:clamp(17px,5vw,25px)}
+@media(max-height:740px){.menu-content h1{font-size:clamp(49px,13vw,67px);margin:7px 0}.menu-lead{margin-bottom:4px}.eyebrow{font-size:9px}.wallet{margin-bottom:7px}.how-to{margin-bottom:7px;padding:3px 10px}.how-to>div{padding:3px 0}.upgrades{margin-bottom:9px}.upgrade-card{min-height:82px;padding:6px}.upgrade-symbol{font-size:18px}.action{padding:14px}.best-line{margin-top:11px}}
+@media(max-height:590px){.how-to{display:none}.menu-content h1{font-size:48px}.upgrades{margin-bottom:8px}.upgrade-card{min-height:70px}.menu-lead{display:none}}
+@media(max-width:360px){.hud{padding-left:8px;padding-right:8px}.logo-chip{font-size:10px;padding:0 8px}.wave-chip{font-size:10px}.hud-button{min-width:34px}.score-chip{padding:0 6px}.life-pill{font-size:12px}}
