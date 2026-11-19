@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#07162c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Battle Rush: Führe deine blaue Armee durch Rechentore, besiege rote Truppen und bezwinge den Boss. Kostenlos und offline spielbar.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <title>Battle Rush — Crowd Battle</title>
+</head>
+<body>
+  <main id="app" aria-label="Battle Rush Spiel">
+    <canvas id="game" aria-label="Spielfeld: mit dem Finger nach links oder rechts ziehen, um die Armee zu lenken"></canvas>
+    <div id="vignette" aria-hidden="true"></div>
+    <header class="hud" id="hud">
+      <div class="hud-row">
+        <div class="hud-chip logo-chip"><span class="logo-symbol">⚔</span><span>BATTLE <b>RUSH</b></span></div>
+        <div class="hud-chip wave-chip">LEVEL <strong id="hudLevel">01</strong></div>
+        <button class="hud-button" id="soundBtn" type="button" aria-label="Ton ein- oder ausschalten" aria-pressed="true">♫</button>
+        <button class="hud-button" id="pauseBtn" type="button" aria-label="Spiel pausieren">Ⅱ</button>
+      </div>
+      <div class="progress-track"><div id="progressFill" class="progress-fill"></div><span class="progress-boss">♛</span></div>
+      <div class="hud-row hud-bottom">
+        <div class="army-pill"><span class="army-dot"></span><span>DEINE ARMEE</span><strong id="hudArmy">10</strong></div>
+        <div class="life-pill" id="hudLives" aria-label="Fünf Leben">♥ ♥ ♥ ♥ ♥</div>
+      </div>
+    </header>
+    <div class="world-note" id="worldNote" aria-live="polite"></div>
+    <div class="tip" id="tip"><span class="finger">↔</span> ZIEHEN, UM ZU LENKEN</div>
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <div class="screen visible" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+      <div class="menu-scene" aria-hidden="true"><span class="orb orb-blue"></span><span class="orb orb-red"></span><span class="slash"></span></div>
+      <div class="menu-content">
+        <div class="eyebrow">CROWD BATTLE · ARCADE</div>
+        <h1 id="menuTitle">BATTLE<br><em>RUSH</em></h1>
+        <p class="menu-lead">BAUE DEINE ARMEE AUF.<br>BESIEGE DIE ROTE HORDE.</p>
+        <div class="how-to"><div><b>01</b><span>Armee nach links und rechts lenken</span></div><div><b>02</b><span><i>×2</i> und <i>+20</i> Tore sammeln</span></div><div><b>03</b><span>Gegner besiegen und den Boss stürmen</span></div></div>
+        <button class="action primary" id="startBtn" type="button">JETZT SPIELEN <span>▶</span></button>
+        <div class="best-line">BESTER LEVEL <strong id="menuBest">01</strong> <span>·</span> KOSTENLOS · OFFLINE</div>
+      </div>
+    </div>
+    <div class="screen" id="pauseScreen" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+      <div class="modal-card"><div class="eyebrow">BATTLE RUSH</div><h2 id="pauseTitle">PAUSE</h2><p>Die Schlacht wartet auf dich.</p><button class="action primary" id="resumeBtn" type="button">WEITERSPIELEN <span>▶</span></button><button class="action secondary" id="restartBtn" type="button">NEU STARTEN</button></div>
+    </div>
+    <div class="screen" id="resultScreen" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
+      <div class="modal-card"><div class="result-icon" id="resultIcon">★</div><div class="eyebrow" id="resultEyebrow">LEVEL ABGESCHLOSSEN</div><h2 id="resultTitle">SIEG!</h2><p id="resultDescription">Deine Armee hat den Boss besiegt.</p><div class="result-stats"><div><span>LEVEL</span><strong id="resultLevel">01</strong></div><div><span>RESTLICHE ARMEE</span><strong id="resultArmy">10</strong></div></div><button class="action primary" id="resultBtn" type="button">NÄCHSTER LEVEL <span>▶</span></button><button class="action secondary" id="resultMenuBtn" type="button">ZUM MENÜ</button></div>
+    </div>
+    <div class="rotate-hint" id="rotateHint">Im Hochformat spielt es sich am besten.</div>
+  </main>
+  <script src="./game.js" defer></script>
+</body>
+</html>
